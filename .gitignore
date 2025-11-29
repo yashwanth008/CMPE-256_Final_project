@@ -1,0 +1,20 @@
+# --- The folder you want to ignore ---
+/pdfs/
+
+# --- Common Python Unnecessary Files ---
+__pycache__/
+*.pyc
+
+# --- Virtual Environment ---
+.venv/
+env/
+venv/
+
+# --- Mac System Files ---
+.DS_Store
+
+# --- Generated Data (Optional) ---
+# It looks like 'index' contains generated database files. 
+# If these can be recreated, you should ignore them too.
+/index/
+*.faiss

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sentence-transformers
+faiss-cpu
+numpy
+google-generativeai
+pypdf
+requests
+python-multipart

@@ -1,0 +1,362 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FunSearch AI 🧠</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 30px; }
+        input { flex-grow: 1; padding: 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; }
+        button { padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0 0 10px 0; color: #2c3e50; }
+        .meta { color: #7f8c8d; font-size: 0.9em; margin-bottom: 10px; }
+        
+        .magic-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); width: 100%; margin-top: 15px; }
+        
+        #reader-view { display: none; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .loader { text-align: center; display: none; padding: 20px; font-weight: bold; color: #667eea; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>✨ FunSearch AI</h1>
+        <p>Turning boring papers into fun insights.</p>
+    </div>
+
+    <div id="search-view">
+        <div class="search-box">
+            <input type="text" id="query" placeholder="Ask about 'Neural Networks', 'Transformers'..." onkeypress="handleEnter(event)">
+            <button onclick="searchPapers()">Search</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <div id="loader" class="loader">
+        🤖 Agents are reading the PDF and making it fun...<br>(This takes about 10 seconds)
+    </div>
+
+    <div id="reader-view">
+        <button onclick="goBack()" style="background: #eee; color: #333; margin-bottom: 20px;">← Back to Search</button>
+        <div id="summary-content"></div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+
+        function handleEnter(e) { if(e.key === 'Enter') searchPapers(); }
+
+        async function searchPapers() {
+            const query = document.getElementById('query').value;
+            const res = await fetch(`${API_URL}/search`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query: query})
+            });
+            const data = await res.json();
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            
+            data.forEach(paper => {
+                resultsDiv.innerHTML += `
+                    <div class="card">
+                        <h3>${paper.title}</h3>
+                        <div class="meta">📅 ${paper.year} | ✍️ ${paper.authors}</div>
+                        <p>${paper.abstract.substring(0, 200)}...</p>
+                        <button class="magic-btn" onclick="summarize('${paper.pdf_url}', '${escape(paper.title)}')">
+                            ✨ Explain this to me!
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        async function summarize(url, title) {
+            document.getElementById('search-view').style.display = 'none';
+            document.getElementById('loader').style.display = 'block';
+            
+            try {
+                const res = await fetch(`${API_URL}/agent_summarize`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pdf_url: url, title: unescape(title)})
+                });
+                const data = await res.json();
+                
+                document.getElementById('summary-content').innerHTML = data.html_content;
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('reader-view').style.display = 'block';
+            } catch (e) {
+                alert("Agent failed to read PDF. It might be blocked by ArXiv.");
+                goBack();
+            }
+        }
+
+        function goBack() {
+            document.getElementById('reader-view').style.display = 'none';
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('search-view').style.display = 'block';
+        }
+    </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepRead AI </title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; color: #333; }
+        .header { text-align: center; margin-bottom: 40px; }
+        
+        /* SEARCH */
+        .search-container { position: sticky; top: 20px; z-index: 100; background: rgba(248, 249, 250, 0.95); padding: 15px 0; backdrop-filter: blur(5px); }
+        .search-box { display: flex; gap: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; background: white; padding: 8px; border: 1px solid #eee; }
+        input { flex-grow: 1; padding: 12px 20px; border: none; font-size: 16px; outline: none; border-radius: 10px; }
+        button.search-btn { padding: 10px 25px; background: #007bff; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+
+        /* CARDS */
+        .card { background: white; padding: 25px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .magic-btn { background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%); width: 100%; margin-top: 20px; color: white; border: none; padding: 14px; border-radius: 10px; cursor: pointer; font-weight: 700; }
+
+        /* READER VIEW */
+        #reader-view { display: none; background: white; padding: 50px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.05); }
+        .article-content { line-height: 1.8; color: #2d3436; font-size: 17px; }
+        .article-content h1 { color: #2d3436; font-weight: 800; }
+        .article-content ul { background: #f8f9fa; padding: 30px 40px; border-radius: 12px; }
+
+        /* FAQ SECTION */
+        .faq-section { margin-top: 40px; border-top: 2px solid #f1f2f6; padding-top: 30px; }
+        .faq-header { font-weight: 800; font-size: 1.4em; margin-bottom: 20px; color: #2d3436; }
+        
+        details { background: #f8f9fa; margin-bottom: 10px; border-radius: 10px; overflow: hidden; }
+        summary { padding: 15px; cursor: pointer; font-weight: 600; color: #2c3e50; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        summary::-webkit-details-marker { display: none; } /* Hide default arrow */
+        summary:after { content: "+"; font-size: 20px; color: #6c5ce7; }
+        details[open] summary:after { content: "-"; }
+        .faq-answer { padding: 0 15px 15px 15px; color: #555; line-height: 1.6; }
+
+        /* RECOMMENDATIONS */
+        .rec-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .rec-card { background: white; border: 1px solid #e9ecef; padding: 15px; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .rec-card:hover { transform: translateY(-3px); border-color: #6c5ce7; box-shadow: 0 5px 15px rgba(108, 92, 231, 0.2); }
+
+        #loader { display: none; text-align: center; padding: 60px; }
+        .emoji-spin { font-size: 50px; animation: spin 2s infinite linear; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* ACTION BUTTONS ROW */
+        .action-row { display: flex; gap: 10px; margin-top: 20px; }
+
+        /* The Standard Buttons (Preview & Download) */
+        .icon-btn { 
+            flex: 1; /* Takes equal space */
+            padding: 12px; border-radius: 10px; border: 1px solid #e1e4e8; 
+            background: #fff; color: #2c3e50; text-decoration: none; 
+            font-weight: 600; font-size: 14px; text-align: center; 
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .icon-btn:hover { background: #f8f9fa; border-color: #cbd5e0; transform: translateY(-2px); }
+
+        /* The Explain Button (Make it stand out) */
+        .magic-btn { 
+            flex: 2; /* Make this button wider than the others */
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%); 
+            color: white; border: none; padding: 12px; border-radius: 10px; 
+            cursor: pointer; font-weight: 700; font-size: 14px; 
+            transition: all 0.2s; box-shadow: 0 4px 10px rgba(108, 92, 231, 0.2);
+            margin-top: 0; /* Override previous margin */
+        }
+        .magic-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(108, 92, 231, 0.3); opacity: 0.95; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>DeepRead AI</h1>
+        <p>Research made readable.</p>
+    </div>
+
+    <div id="main-view">
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="query" placeholder="Search papers..." onkeypress="handleEnter(event)">
+                <button class="search-btn" onclick="searchPapers()">Search</button>
+            </div>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <div id="loader">
+        <div class="emoji-spin">🤖</div>
+        <h3>Reading & Analyzing...</h3>
+        <p style="color:#777">This might take 10-20 seconds (Downloading PDF...)</p>
+    </div>
+
+    <div id="reader-view">
+        <button onclick="goBack()" style="background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 30px; cursor: pointer; margin-bottom: 30px;">← Back</button>
+        
+        <div id="summary-content" class="article-content"></div>
+
+        <div class="faq-section">
+            <div class="faq-header"> Frequently Asked Questions</div>
+            <div id="faq-container"></div>
+        </div>
+
+        <hr style="margin: 50px 0; border:0; border-top:1px solid #eee;">
+        
+        <div style="text-align:center; color:#999; font-weight:bold; font-size:12px; text-transform:uppercase; margin-bottom:15px;">Continue Reading</div>
+        <div class="rec-container" id="rec-cards"></div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+
+        function handleEnter(e) { if(e.key === 'Enter') searchPapers(); }
+
+        async function searchPapers() {
+            const query = document.getElementById('query').value;
+            if(!query) return;
+            document.getElementById('results').innerHTML = '<div style="text-align:center; padding:20px;">Searching...</div>';
+            
+            const res = await fetch(`${API_URL}/search`, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query: query})
+            });
+            const data = await res.json();
+            renderResults(data.papers);
+        }
+
+        function renderResults(papers) {
+            const div = document.getElementById('results');
+            div.innerHTML = '';
+            papers.forEach(p => {
+                div.innerHTML += `
+                    <div class="card">
+                        <h3>${p.title}</h3>
+                        <div style="color:#777; font-size:0.9em;">${p.authors} (${p.year})</div>
+                        <p>${p.abstract.substring(0, 200)}...</p>
+                        <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">✨ Explain</button>
+                    </div>
+                `;
+            });
+        }
+
+        // 🧠 UNIFIED FUNCTION FOR SUMMARIZING (Handles clicks from everywhere)
+        async function summarize(url, title) {
+            // 1. Show Loader immediately
+            document.getElementById('main-view').style.display = 'none';
+            document.getElementById('reader-view').style.display = 'none'; // Hide current reader if open
+            document.getElementById('loader').style.display = 'block';
+            window.scrollTo(0,0);
+
+            try {
+                const res = await fetch(`${API_URL}/agent_summarize`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pdf_url: url, title: unescape(title)})
+                });
+                const data = await res.json();
+                
+                // 2. Render Blog
+                document.getElementById('summary-content').innerHTML = marked.parse(data.html_content);
+                
+                // 3. Render FAQ (Accordion Style)
+                const faqDiv = document.getElementById('faq-container');
+                faqDiv.innerHTML = '';
+                if(data.faq && data.faq.length > 0) {
+                    data.faq.forEach(item => {
+                        faqDiv.innerHTML += `
+                            <details>
+                                <summary>${item.question}</summary>
+                                <div class="faq-answer">${item.answer}</div>
+                            </details>
+                        `;
+                    });
+                } else {
+                    faqDiv.innerHTML = '<div style="color:#999">No questions generated.</div>';
+                }
+
+                // 4. Render Recommendations
+                const recDiv = document.getElementById('rec-cards');
+                recDiv.innerHTML = '';
+                if(data.recommendations) {
+                    data.recommendations.forEach(r => {
+                        recDiv.innerHTML += `
+                            <div class="rec-card" onclick="summarize('${r.pdf_url}', '${escape(r.title)}')">
+                                <div style="font-weight:bold; font-size:0.95em; margin-bottom:5px;">${r.title}</div>
+                                <div style="font-size:0.8em; color:#777;">${r.year}</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // 5. Show Content
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('reader-view').style.display = 'block';
+                
+            } catch (e) {
+                console.error(e);
+                alert("Error loading paper. Please try again.");
+                goBack();
+            }
+        }
+
+        function goBack() {
+            document.getElementById('reader-view').style.display = 'none';
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('main-view').style.display = 'block';
+        }
+
+        function renderResults(papers) {
+            const div = document.getElementById('results');
+            div.innerHTML = '';
+            
+            if (papers.length === 0) {
+                div.innerHTML = '<div style="text-align:center; padding:40px; color:#777;">No results found.</div>';
+                return;
+            }
+
+            papers.forEach(p => {
+                // Construct the URLs
+                // We use the PDF URL for both, but browsers handle them differently based on user settings
+                // To force download, we add the 'download' attribute (works on some browsers/servers)
+                
+                div.innerHTML += `
+                    <div class="card">
+                        <h3>${p.title}</h3>
+                        <div style="color:#777; font-size:0.9em; margin-bottom:15px;">
+                            ${p.authors} &nbsp;•&nbsp; ${p.year}
+                        </div>
+                        <p style="color:#555; line-height:1.6;">${p.abstract.substring(0, 200)}...</p>
+                        
+                        <div class="action-row">
+                            <a href="${p.pdf_url}" target="_blank" class="icon-btn" title="View PDF in new tab">
+                                 Preview
+                            </a>
+                            
+                            <a href="${p.pdf_url}" download class="icon-btn" title="Save PDF">
+                                 Download
+                            </a>
+                            
+                            <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">
+                                 Explain
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
