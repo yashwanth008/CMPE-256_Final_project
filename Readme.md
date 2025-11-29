@@ -13,7 +13,7 @@ It combines **Dense Vector Retrieval (FAISS)** for semantic search with **Associ
 * **Discovery Engine:** Implements the **Apriori Algorithm** to analyze the retrieved papers and surface hidden topics (e.g., *"People reading about Neural Networks also explore Optimization"*).
 
 ### 2. Agentic RAG Summarizer
-* **"Fun Mode" Summaries:** Transforms dry academic text into engaging, blog-style content using **Google Gemini 1.5 Flash**.
+* **"Fun Mode" Summaries:** Transforms dry academic text into engaging, blog-style content using **Google Gemini 2.5 Flash-Lite**.
 * **Robust Parsing:** Uses a custom separator strategy to ensure crash-proof JSON/Markdown extraction.
 * **Interactive Chat:** Allows users to ask specific questions about the paper ("What was the learning rate?") with instant, grounded answers.
 
@@ -47,5 +47,5 @@ This project aligns closely with modern Recommender Systems architectures:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/yourusername/DeepRead-ai.git](https://github.com/yourusername/DeepRead-ai.git)
+git clone https://github.com/yashwanth008/CMPE-256_Final_project.git
 cd DeepRead-ai
