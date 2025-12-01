@@ -12,9 +12,6 @@ __pycache__/
 .venv/
 venv/
 
-# --- Environment Variables ---
-.env
-
 # --- Mac System Files ---
 .DS_Store
 
