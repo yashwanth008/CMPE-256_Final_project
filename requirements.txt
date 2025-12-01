@@ -7,3 +7,4 @@ google-generativeai
 pypdf
 requests
 python-multipart
+spacy

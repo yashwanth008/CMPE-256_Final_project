@@ -244,7 +244,7 @@
                 div.innerHTML += `
                     <div class="card">
                         <h3>${p.title}</h3>
-                        <div style="color:#777; font-size:0.9em;">${p.authors} (${p.year})</div>
+                        <div style="color:#777; font-size:0.9em;">${p.authors}${p.year ? ' (' + p.year + ')' : ''}</div>
                         <p>${p.abstract.substring(0, 200)}...</p>
                         <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">✨ Explain</button>
                     </div>
@@ -336,7 +336,7 @@
                     <div class="card">
                         <h3>${p.title}</h3>
                         <div style="color:#777; font-size:0.9em; margin-bottom:15px;">
-                            ${p.authors} &nbsp;•&nbsp; ${p.year}
+                            ${p.authors}${p.year ? ' &nbsp;•&nbsp; ' + p.year : ''}
                         </div>
                         <p style="color:#555; line-height:1.6;">${p.abstract.substring(0, 200)}...</p>
                         
