@@ -273,7 +273,7 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import google.generativeai as genai
-from fastapi.middleware.cors import CORSMiddleware
+import spacy
 
 # --- 1. SSL FIX FOR MAC (Prevents download errors) ---
 try:
@@ -320,15 +320,18 @@ app.add_middleware(
 search_index = None
 search_model = None
 paper_metadata = []
+nlp = None  # spaCy NER model
 
 @app.on_event("startup")
 def load_resources():
-    global search_index, search_model, paper_metadata
-    print("⏳ Loading AI Models...")
+    global search_index, search_model, paper_metadata, nlp
+    print("Loading AI Models...")
     search_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     search_index = faiss.read_index(INDEX_PATH)
     with open(METADATA_PATH, "r", encoding="utf-8") as f:
         paper_metadata = json.load(f)
+    # Load spaCy NER model
+    nlp = spacy.load("en_core_web_sm")
     print(f"System Ready! {len(paper_metadata)} papers loaded.")
 
 # --- 4. HYBRID DOWNLOADER (Fixes 'File Not Found') ---
@@ -382,25 +385,106 @@ class SummarizeRequest(BaseModel):
 
 @app.post("/search")
 def search_papers(payload: SearchQuery):
-    query_vector = search_model.encode([payload.query], normalize_embeddings=True).astype('float32')
-    distances, indices = search_index.search(query_vector, k=15) 
-    
+    query = payload.query
+
+    # Extract entities using spaCy NER
+    doc = nlp(query)
+    author_filter = None
+    year_filter = None
+    search_topic = query  # default to full query
+
+    # Extract PERSON (potential author) and DATE (potential year)
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            author_filter = ent.text
+            # Remove author name from search topic
+            search_topic = search_topic.replace(ent.text, "").strip()
+        elif ent.label_ == "DATE":
+            # Check if it's a 4-digit year
+            if len(ent.text) == 4 and ent.text.isdigit():
+                year_filter = ent.text
+                search_topic = search_topic.replace(ent.text, "").strip()
+
+    # Clean up search topic
+    search_topic = " ".join(search_topic.split())  # normalize whitespace
+    if not search_topic:
+        search_topic = query  # fallback to original query
+
+    print(f"NER Extraction - Topic: '{search_topic}', Author: '{author_filter}', Year: '{year_filter}'")
+
+    # Determine search strategy based on topic quality
+    # If topic is too short/generic after NER (like "papers by"), scan all papers with filters
+    topic_words = search_topic.split()
+    is_generic_topic = len(topic_words) <= 2 and (author_filter or year_filter)
+
+    print(f"Search Strategy - Generic: {is_generic_topic}, Topic: '{search_topic}', Author: '{author_filter}', Year: '{year_filter}'")
+
     results = []
-    for i, idx in enumerate(indices[0]):
-        if idx == -1: continue
-        item = paper_metadata[idx]
-        raw_id = str(item.get('paper_id', ''))
-        clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
-        pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
-        
-        results.append({
-            "title": item.get('title'),
-            "abstract": item.get('abstract'),
-            "authors": item.get('authors'),
-            "year": item.get('year'),
-            "pdf_url": pdf_url
-        })
-    return {"papers": results}
+
+    if is_generic_topic:
+        # For author/year-only queries, scan entire dataset with filters
+        print(f"Scanning {len(paper_metadata)} papers with filters...")
+        for item in paper_metadata:
+            # Apply filters
+            if author_filter and author_filter.lower() not in item.get('authors', '').lower():
+                continue
+            if year_filter and str(item.get('year')) != year_filter:
+                continue
+
+            raw_id = str(item.get('paper_id', ''))
+            clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
+            pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
+
+            results.append({
+                "title": item.get('title'),
+                "abstract": item.get('abstract'),
+                "authors": item.get('authors'),
+                "year": item.get('year'),
+                "pdf_url": pdf_url
+            })
+
+            # Limit to top 10
+            if len(results) >= 10:
+                break
+    else:
+        # Normal semantic search with filtering
+        query_vector = search_model.encode([search_topic], normalize_embeddings=True).astype('float32')
+        distances, indices = search_index.search(query_vector, k=50)
+
+        for i, idx in enumerate(indices[0]):
+            if idx == -1: continue
+            item = paper_metadata[idx]
+
+            # Apply filters
+            if author_filter and author_filter.lower() not in item.get('authors', '').lower():
+                continue
+            if year_filter and str(item.get('year')) != year_filter:
+                continue
+
+            raw_id = str(item.get('paper_id', ''))
+            clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
+            pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
+
+            results.append({
+                "title": item.get('title'),
+                "abstract": item.get('abstract'),
+                "authors": item.get('authors'),
+                "year": item.get('year'),
+                "pdf_url": pdf_url
+            })
+
+            # Limit to top 10 after filtering
+            if len(results) >= 10:
+                break
+
+    return {
+        "papers": results,
+        "extracted": {
+            "topic": search_topic,
+            "author": author_filter,
+            "year": year_filter
+        }
+    }
 
 @app.post("/agent_summarize")
 def agentic_summary(payload: SummarizeRequest):

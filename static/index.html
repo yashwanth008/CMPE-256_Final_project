@@ -286,15 +286,9 @@
                 div.innerHTML += `
                     <div class="card">
                         <h3>${p.title}</h3>
-                        <div class="meta">
-                             ${p.authors ? p.authors.split(',')[0] + ' et al.' : 'Unknown'} &nbsp;•&nbsp; ${p.year}
-                        </div>
-                        
-                        <div class="action-row">
-                            <a href="${p.pdf_url}" target="_blank" class="icon-btn"> Preview</a>
-                            <a href="${p.pdf_url}" download class="icon-btn"> Download</a>
-                            <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">Explain</button>
-                        </div>
+                        <div style="color:#777; font-size:0.9em;">${p.authors}${p.year ? ' (' + p.year + ')' : ''}</div>
+                        <p>${p.abstract.substring(0, 200)}...</p>
+                        <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">✨ Explain</button>
                     </div>
                 `;
             });
@@ -353,6 +347,46 @@
             document.getElementById('reader-view').style.display = 'none';
             document.getElementById('loader').style.display = 'none';
             document.getElementById('main-view').style.display = 'block';
+        }
+
+        function renderResults(papers) {
+            const div = document.getElementById('results');
+            div.innerHTML = '';
+            
+            if (papers.length === 0) {
+                div.innerHTML = '<div style="text-align:center; padding:40px; color:#777;">No results found.</div>';
+                return;
+            }
+
+            papers.forEach(p => {
+                // Construct the URLs
+                // We use the PDF URL for both, but browsers handle them differently based on user settings
+                // To force download, we add the 'download' attribute (works on some browsers/servers)
+                
+                div.innerHTML += `
+                    <div class="card">
+                        <h3>${p.title}</h3>
+                        <div style="color:#777; font-size:0.9em; margin-bottom:15px;">
+                            ${p.authors}${p.year ? ' &nbsp;•&nbsp; ' + p.year : ''}
+                        </div>
+                        <p style="color:#555; line-height:1.6;">${p.abstract.substring(0, 200)}...</p>
+                        
+                        <div class="action-row">
+                            <a href="${p.pdf_url}" target="_blank" class="icon-btn" title="View PDF in new tab">
+                                 Preview
+                            </a>
+                            
+                            <a href="${p.pdf_url}" download class="icon-btn" title="Save PDF">
+                                 Download
+                            </a>
+                            
+                            <button class="magic-btn" onclick="summarize('${p.pdf_url}', '${escape(p.title)}')">
+                                 Explain
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
         }
     </script>
 </body>
