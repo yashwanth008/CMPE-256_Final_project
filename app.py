@@ -14,7 +14,7 @@
 # import google.generativeai as genai
 
 # # --- CONFIGURATION ---
-# GOOGLE_API_KEY = "AIzaSyCtoV2QBnu3iai9XIWrCR58tSiIgpxnK-E"  # 🔴 PASTE KEY HERE
+# GOOGLE_API_KEY = "-E"  # 🔴 PASTE KEY HERE
 # INDEX_PATH = "index/papers.faiss"
 # METADATA_PATH = "index/metadata.json"
 # # --- CONFIGURATION ---
