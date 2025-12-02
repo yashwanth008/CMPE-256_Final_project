@@ -14,7 +14,7 @@
 # import google.generativeai as genai
 
 # # --- CONFIGURATION ---
-# GOOGLE_API_KEY = "AIzaSyCtoV2QBnu3iai9XIWrCR58tSiIgpxnK-E"  # 🔴 PASTE KEY HERE
+# GOOGLE_API_KEY = "-E"  # 🔴 PASTE KEY HERE
 # INDEX_PATH = "index/papers.faiss"
 # METADATA_PATH = "index/metadata.json"
 # # --- CONFIGURATION ---
@@ -304,12 +304,17 @@ model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
 app = FastAPI()
 
+app = FastAPI()
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allows ALL origins 
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
 )
+
 
 # --- 3. LOAD RESOURCES ---
 search_index = None
@@ -487,32 +492,30 @@ def agentic_summary(payload: SummarizeRequest):
     
     full_text = get_pdf_text(payload.pdf_url)
     if not full_text:
-        return {"html_content": "<h3>Error</h3><p>Could not download paper.</p>", "faq": [], "recommendations": []}
+        return {"html_content": "<h3> Error</h3><p>Could not download paper.</p>", "faq": [], "recommendations": []}
 
-    # --- 5. ROBUST PROMPT WITH SEPARATOR ---
+    # --- UPDATED PROMPT: MIXED AUDIENCE (Student + Engineer) ---
     prompt = f"""
-    You are a quirky Science YouTuber. Explain this paper: "{payload.title}".
-    
+    You are a Senior Research Scientist writing a blog post for a mixed audience of enthusiastic students and cynical engineers. 
+    Explain this paper "{payload.title}" clearly and insightfully.
+
     Paper Text (Truncated):
     {full_text[:30000]}
 
     INSTRUCTIONS:
-    1. Write a Fun Blog Post (Markdown). Use ## headings.
-    2. Type strictly this separator: |||FAQ|||
-    3. Write 3 pairs of Questions and Answers in this exact format:
-       Q: [Question]
-       A: [Answer]
+    1. Write a Robust Tech Blog Post (Markdown). 
+       - Use ## headings (e.g., "The Problem", "The Solution", "The Results").
+       - Balance clarity with technical depth.
     
-    Example Output:
-    # Title
-    ## Big Idea
-    (Content...)
-
-    |||FAQ|||
-    Q: Is this real-time?
-    A: Yes, it runs at 30fps.
-    Q: What data?
-    A: Only ImageNet.
+    2. Type strictly this separator: |||FAQ|||
+    
+    3. Write exactly 4 Questions & Answers. 
+       - MIX them up (do not group them by type).
+       - Include 2 "Beginner/Student" questions (e.g., "What is a Transformer?", "Why is this important?", "How is this different from basic X?").
+       - Include 2 "Hacker/Engineer" questions (e.g., "Can I run this on consumer hardware?", "Is the code open source?", "Is this fast enough for production?").
+       - Format exactly as:
+         Q: [Question]
+         A: [Answer]
     """
     
     summary_markdown = ""
@@ -535,12 +538,12 @@ def agentic_summary(payload: SummarizeRequest):
                 faq_list.append({"question": q.strip(), "answer": a.strip()})
         else:
             summary_markdown = text_resp
-            faq_list = [{"question": "AI generated no FAQ", "answer": "Reading the full text might help!"}]
+            faq_list = [{"question": "No FAQ Generated", "answer": "The model focused purely on the summary."}]
 
     except Exception as e:
         summary_markdown = f"### Error\n{str(e)}"
 
-    # --- 7. RECOMMENDATIONS ---
+    # --- 7. RECOMMENDATIONS (Unchanged) ---
     recommendations = []
     try:
         query_vector = search_model.encode([payload.title], normalize_embeddings=True).astype('float32')

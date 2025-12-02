@@ -1,8 +1,6 @@
 # --- The folder you want to ignore ---
 /pdfs/
 
-# --- Claude Code ---
-.claude/
 
 # --- Common Python Unnecessary Files ---
 __pycache__/
