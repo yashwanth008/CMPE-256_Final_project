@@ -259,13 +259,27 @@
             const query = document.getElementById('query').value;
             if(!query) return;
             document.getElementById('results').innerHTML = '<div style="text-align:center; padding:40px; color:#666;">Searching...</div>';
-            
+
             try {
                 const res = await fetch(`${API_URL}/search`, {
-                    method: 'POST', 
+                    method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({query: query})
                 });
+
+                // Check if response is an error (400, 500, etc.)
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    const errorMessage = errorData.detail || "An error occurred";
+                    document.getElementById('results').innerHTML = `
+                        <div style="text-align:center; padding:60px 20px;">
+                            <div style="color:#ff6b6b; font-size:1.1em; font-weight:600; margin-bottom:10px;">Invalid Query</div>
+                            <div style="color:#888; font-size:0.95em;">${errorMessage}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
                 const data = await res.json();
                 renderResults(data.papers);
             } catch(e) {
