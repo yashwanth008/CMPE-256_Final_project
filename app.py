@@ -334,7 +334,25 @@ def load_resources():
     nlp = spacy.load("en_core_web_sm")
     print(f"System Ready! {len(paper_metadata)} papers loaded.")
 
-# --- 4. HYBRID DOWNLOADER (Fixes 'File Not Found') ---
+# --- 4. HELPER FUNCTION: Extract Year from ArXiv Paper ID ---
+def extract_year_from_paper_id(paper_id):
+    """
+    Extract publication year from ArXiv paper ID.
+    Examples:
+      cs-9308101 -> 1993
+      cs-0102103 -> 2001
+      1706.03762 -> 2017
+      2024.12345 -> 2024
+    """
+    match = re.search(r'[\-/]?(\d{2})(\d{2})', paper_id)
+    if match:
+        yy = int(match.group(1))
+        # Convert YY to YYYY (90-99 = 1990s, 00-99 = 2000s)
+        year = 1900 + yy if yy >= 90 else 2000 + yy
+        return str(year)
+    return None
+
+# --- 5. HYBRID DOWNLOADER (Fixes 'File Not Found') ---
 def get_pdf_text(url):
     try:
         clean_name = url.split("/")[-1]
@@ -383,29 +401,71 @@ class SummarizeRequest(BaseModel):
     pdf_url: str
     title: str
 
+# --- 6. HELPER FUNCTION: Validate Search Query ---
+def validate_query(query: str) -> tuple[bool, str]:
+    """
+    Validates search query and returns (is_valid, error_message).
+    Returns (True, "") if valid, (False, error_message) if invalid.
+    """
+    # 1. Empty or whitespace only
+    if not query or not query.strip():
+        return False, "Please enter a search query"
+
+    # 2. Minimum length (at least 2 characters after stripping)
+    if len(query.strip()) < 2:
+        return False, "Query too short (minimum 2 characters)"
+
+    # 3. Maximum length (prevent DoS attacks)
+    if len(query) > 500:
+        return False, "Query too long (maximum 500 characters)"
+
+    # 4. Check if query contains at least one alphanumeric character
+    if not any(c.isalnum() for c in query):
+        return False, "Query must contain at least one letter or number"
+
+    # 5. Check for excessive special characters (>80% special chars is suspicious)
+    alphanumeric_count = sum(c.isalnum() or c.isspace() for c in query)
+    if alphanumeric_count / len(query) < 0.2:
+        return False, "Query contains too many special characters"
+
+    return True, ""
+
 @app.post("/search")
 def search_papers(payload: SearchQuery):
     query = payload.query
 
-    # Extract entities using spaCy NER
-    doc = nlp(query)
+    # Validate query before processing
+    is_valid, error_message = validate_query(query)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+
     author_filter = None
     year_filter = None
     search_topic = query  # default to full query
 
-    # Extract PERSON (potential author) and DATE (potential year)
+    # ========================================
+    # STEP 1: Extract Year using Regex (More reliable than spaCy for years)
+    # ========================================
+    year_match = re.search(r'\b(19\d{2}|20\d{2})\b', query)
+    if year_match:
+        year_filter = year_match.group(1)
+        # Remove year from topic
+        search_topic = re.sub(r'\b' + year_filter + r'\b', '', search_topic, count=1).strip()
+
+    # ========================================
+    # STEP 2: Extract Author using spaCy NER (Better for names with context)
+    # ========================================
+    doc = nlp(search_topic)
     for ent in doc.ents:
         if ent.label_ == "PERSON":
             author_filter = ent.text
             # Remove author name from search topic
-            search_topic = search_topic.replace(ent.text, "").strip()
-        elif ent.label_ == "DATE":
-            # Check if it's a 4-digit year
-            if len(ent.text) == 4 and ent.text.isdigit():
-                year_filter = ent.text
-                search_topic = search_topic.replace(ent.text, "").strip()
+            search_topic = search_topic.replace(ent.text, "", 1).strip()
+            break  # Only take first author
 
-    # Clean up search topic
+    # ========================================
+    # STEP 3: Clean up search topic
+    # ========================================
     search_topic = " ".join(search_topic.split())  # normalize whitespace
     if not search_topic:
         search_topic = query  # fallback to original query
@@ -414,8 +474,9 @@ def search_papers(payload: SearchQuery):
 
     # Determine search strategy based on topic quality
     # If topic is too short/generic after NER (like "papers by"), scan all papers with filters
+    # IMPORTANT: If BOTH author AND year are present, always use generic mode (linear scan)
     topic_words = search_topic.split()
-    is_generic_topic = len(topic_words) <= 2 and (author_filter or year_filter)
+    is_generic_topic = (len(topic_words) <= 2 and (author_filter or year_filter)) or (author_filter and year_filter)
 
     print(f"Search Strategy - Generic: {is_generic_topic}, Topic: '{search_topic}', Author: '{author_filter}', Year: '{year_filter}'")
 
@@ -425,21 +486,28 @@ def search_papers(payload: SearchQuery):
         # For author/year-only queries, scan entire dataset with filters
         print(f"Scanning {len(paper_metadata)} papers with filters...")
         for item in paper_metadata:
-            # Apply filters
+            # Apply author filter
             if author_filter and author_filter.lower() not in item.get('authors', '').lower():
                 continue
-            if year_filter and str(item.get('year')) != year_filter:
-                continue
+
+            # Apply year filter (extract from paper_id since year field is null)
+            if year_filter:
+                paper_year = extract_year_from_paper_id(item.get('paper_id', ''))
+                if paper_year != year_filter:
+                    continue
 
             raw_id = str(item.get('paper_id', ''))
             clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
             pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
 
+            # Extract year for display
+            display_year = extract_year_from_paper_id(raw_id)
+
             results.append({
                 "title": item.get('title'),
                 "abstract": item.get('abstract'),
                 "authors": item.get('authors'),
-                "year": item.get('year'),
+                "year": display_year,  # Use extracted year instead of null
                 "pdf_url": pdf_url
             })
 
@@ -455,21 +523,28 @@ def search_papers(payload: SearchQuery):
             if idx == -1: continue
             item = paper_metadata[idx]
 
-            # Apply filters
+            # Apply author filter
             if author_filter and author_filter.lower() not in item.get('authors', '').lower():
                 continue
-            if year_filter and str(item.get('year')) != year_filter:
-                continue
+
+            # Apply year filter (extract from paper_id since year field is null)
+            if year_filter:
+                paper_year = extract_year_from_paper_id(item.get('paper_id', ''))
+                if paper_year != year_filter:
+                    continue
 
             raw_id = str(item.get('paper_id', ''))
             clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
             pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
 
+            # Extract year for display
+            display_year = extract_year_from_paper_id(raw_id)
+
             results.append({
                 "title": item.get('title'),
                 "abstract": item.get('abstract'),
                 "authors": item.get('authors'),
-                "year": item.get('year'),
+                "year": display_year,  # Use extracted year instead of null
                 "pdf_url": pdf_url
             })
 
@@ -543,7 +618,7 @@ def agentic_summary(payload: SummarizeRequest):
     except Exception as e:
         summary_markdown = f"### Error\n{str(e)}"
 
-    # --- 7. RECOMMENDATIONS (Unchanged) ---
+    # --- 7. RECOMMENDATIONS (Extract year from paper_id) ---
     recommendations = []
     try:
         query_vector = search_model.encode([payload.title], normalize_embeddings=True).astype('float32')
@@ -552,12 +627,16 @@ def agentic_summary(payload: SummarizeRequest):
             if idx == -1: continue
             item = paper_metadata[idx]
             if item.get('title') == payload.title: continue
-            
+
             raw_id = str(item.get('paper_id', ''))
             clean_id = raw_id.replace('abs-', '').replace('arxiv:', '')
+
+            # Extract year from paper_id instead of using null year field
+            display_year = extract_year_from_paper_id(raw_id)
+
             recommendations.append({
                 "title": item.get('title'),
-                "year": item.get('year'),
+                "year": display_year,  # Use extracted year instead of null
                 "pdf_url": f"https://arxiv.org/pdf/{clean_id}.pdf"
             })
     except:
