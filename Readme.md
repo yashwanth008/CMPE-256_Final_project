@@ -1,28 +1,41 @@
 # DeepRead AI: Generative Research Assistant
+Submitted By:
+**Venkata Yashwanth Paladugu**; 
+**Prachi Gupta**; 
+**Aniket Anil Naik**;
 
 **DeepRead AI** is a hybrid recommender system and agentic research assistant designed to make academic literature accessible, engaging, and discoverable.
 
-It combines **Dense Vector Retrieval (FAISS)** for semantic search with **KNN** for discovery, effectively solving the "Cold Start" problem in research while providing an **Agentic RAG** interface to summarize and explain complex PDFs.
+It combines **Dense Vector Retrieval (FAISS)** for semantic search with **Association Rule Mining** for discovery, effectively solving the "Cold Start" problem in research while providing an **Agentic RAG** interface to summarize and explain complex PDFs.
+
+[**Presentation**](https://docs.google.com/presentation/d/1VjDmCmVzAmjwjQXdm7DbDdzOarUMe6tf/edit?usp=sharing&ouid=114871290906979151970&rtpof=true&sd=true)
+
+[**Video demo**](https://drive.google.com/file/d/18kWeIBVi9lLJyry2E5h69D7DC_wkZjWk/view?usp=sharing)
+
+[**Report**](https://docs.google.com/document/d/1Fs1OnQ0Nf-x7kM5mhAmdRYUNYPAPNGuA/edit?usp=sharing&ouid=114871290906979151970&rtpof=true&sd=true)
+
+[**Github**](https://github.com/yashwanth008/CMPE-256_Final_project)
+
+[**Vector index**](https://drive.google.com/drive/folders/1PVAUkxg57mYfhxu9ModPbJJCVQY4om_O?usp=sharing)
 
 ---
 
 ##  Key Features
 
 ###  1. Hybrid Search Engine
-* **Semantic Search:** Uses **Sentence-Transformers** (BERT-based) to understand the *meaning* of a query, not just keyword matching.
-* **Discovery Engine:** Implements the **KNN Algorithm** to analyze the retrieved papers and surface hidden topics (e.g., *"People reading about Neural Networks also explore Optimization"*).
+* **Semantic Search:** Uses **Sentence-Transformers** to understand the *meaning* of a query, not just keyword matching.
+* **Discovery Engine:** Implements the **KNN similarity Search Algorithm** to analyze the retrieved papers and surface hidden topics (e.g., *"People reading about Neural Networks also explore Optimization"*).
 
 ### 2. Agentic RAG Summarizer
-* **"Fun Mode" Summaries:** Transforms dry academic text into engaging, blog-style content using **Google Gemini 2.5 Flash-Lite**.
-* **Robust Parsing:** Uses a custom separator strategy to ensure crash-proof JSON/Markdown extraction.
-* **Interactive Chat:** Allows users to ask specific questions about the paper ("What was the learning rate?") with instant, grounded answers.
+* **"Senior Research Scientist Mode" Summaries:** Transforms dry academic text into engaging, blog-style content using **Google Gemini**.
+* **Questions Generation Agent** Uses a custom separator strategy to ensure crash-proof JSON/Markdown extraction. It is grounded from agent 1's summary and based on that information this agent creates 4 questions of varying difficulty levels.
 
 ### 3. Smart Local Caching
 * **Hybrid Downloader:** Automatically checks a local `pdfs/` folder first. If the file is missing, it auto-downloads it from ArXiv to prevent redundant network calls and IP blocks.
-* **Privacy First:** Papers are processed locally after download.
+
 
 ### 4. Item-to-Item Recommendations
-* **Contextual Suggestions:** At the end of every summary, the system uses vector similarity to recommend the next 3 most relevant papers to read, creating an infinite learning loop.
+* **Contextual Suggestions:** At the end of every summary, the **agent 3** uses vector similarity to recommend the next 3 most relevant papers to read, creating an infinite learning loop.
 
 ---
 
@@ -34,7 +47,7 @@ This project aligns closely with modern Recommender Systems architectures:
 | :--- | :--- | :--- |
 | **Embedding Layer** | `all-MiniLM-L6-v2` | **Content-Based Filtering:** Converting unstructured text into dense vector space. |
 | **Retrieval Layer** | `FAISS` (Facebook AI Similarity Search) | **Candidate Generation:** Approximate Nearest Neighbor (ANN) search for low-latency retrieval. |
-| **Discovery Layer** | `mlxtend` (KNN) | **KNN:** Mining frequent itemsets to calculate Association Rules . |
+| **Discovery Layer** | `KNN similarity Search Algorithm` |  Mining frequent itemsets to calculate Association Rules  |
 | **Generation Layer** | `Google Gemini API` | **GenRec (Generative Recommendation):** Using LLMs to explain *why* an item is relevant and summarize it. |
 
 ---
@@ -65,7 +78,7 @@ Required packages include:
 - `pypdf` - PDF text extraction
 - `python-dotenv` - Environment variable management
 - `spacy` - Named Entity Recognition (NER)
-- `mlxtend` - KNN algorithm for association rules
+
 
 ### Step 3: Download spaCy Language Model
 ```bash
@@ -354,4 +367,4 @@ For questions or issues, please open an issue on the [GitHub repository](https:/
 
 ---
 
-**Built with by the Venkata Yashwanth Paladugu, Prachi Gupta and Aniket Anil Naik**
+**Built with by the CMPE-256 Team**
